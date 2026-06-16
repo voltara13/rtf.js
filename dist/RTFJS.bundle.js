@@ -7644,8 +7644,20 @@ var ShpInstDestination = /** @class */ (function (_super) {
         _this._top = null;
         _this._right = null;
         _this._bottom = null;
+        _this._pictureClaimed = false;
         return _this;
     }
+    // A Word shape stores the same image several times (the "pib" source, a
+    // pre-rendered "\result", legacy fallbacks). Only the first one should be
+    // emitted; this returns true once and false for every later picture so the
+    // duplicates are dropped instead of stacking on the page.
+    ShpInstDestination.prototype.claimPicture = function () {
+        if (this._pictureClaimed) {
+            return false;
+        }
+        this._pictureClaimed = true;
+        return true;
+    };
     ShpInstDestination.prototype.handleKeyword = function (keyword, param) {
         switch (keyword) {
             case "shpleft":
@@ -7848,12 +7860,21 @@ var PictDestination = /** @class */ (function (_super) {
         }
         var pictGroup = (0,_DestinationBase__WEBPACK_IMPORTED_MODULE_3__.findParentDestination)(this.parser, "pict-group");
         var isLegacy = (pictGroup != null ? pictGroup.isLegacy() : null);
-        // When embedded in a Word shape, the shape's bounding box is the real
-        // display size — the picture is scaled into it — so prefer it over the
-        // picture's own \picwgoal/\pichgoal.
+        // When embedded in a Word shape, the shape stores the same image more
+        // than once (pib source, \result, legacy fallbacks). Render only the
+        // first; later copies would stack as duplicates on the page.
         var shp = (0,_DestinationBase__WEBPACK_IMPORTED_MODULE_3__.findParentDestination)(this.parser, "shpinst");
-        if (shp != null && shp.shapeWidth > 0 && shp.shapeHeight > 0) {
-            this._displaysize = { width: shp.shapeWidth, height: shp.shapeHeight };
+        if (shp != null) {
+            if (!shp.claimPicture()) {
+                delete this.text;
+                return { isLegacy: isLegacy, element: null };
+            }
+            // The shape's bounding box is the real display size — the picture
+            // is scaled into it — so prefer it over the picture's own
+            // \picwgoal/\pichgoal.
+            if (shp.shapeWidth > 0 && shp.shapeHeight > 0) {
+                this._displaysize = { width: shp.shapeWidth, height: shp.shapeHeight };
+            }
         }
         var type = this._type;
         if (typeof type === "function") {

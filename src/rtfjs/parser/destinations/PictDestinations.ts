@@ -46,9 +46,22 @@ export class ShpInstDestination extends DestinationTextBase {
     private _top: number = null;
     private _right: number = null;
     private _bottom: number = null;
+    private _pictureClaimed: boolean = false;
 
     constructor(parser?: GlobalState, inst?: Document, name?: string, param?: number) {
         super("shpinst");
+    }
+
+    // A Word shape stores the same image several times (the "pib" source, a
+    // pre-rendered "\result", legacy fallbacks). Only the first one should be
+    // emitted; this returns true once and false for every later picture so the
+    // duplicates are dropped instead of stacking on the page.
+    public claimPicture(): boolean {
+        if (this._pictureClaimed) {
+            return false;
+        }
+        this._pictureClaimed = true;
+        return true;
     }
 
     public handleKeyword(keyword: string, param: number): boolean {
@@ -251,12 +264,21 @@ export class PictDestination extends DestinationTextBase {
         const pictGroup = findParentDestination(this.parser, "pict-group") as any as IPictGroupDestination;
         const isLegacy = (pictGroup != null ? pictGroup.isLegacy() : null);
 
-        // When embedded in a Word shape, the shape's bounding box is the real
-        // display size — the picture is scaled into it — so prefer it over the
-        // picture's own \picwgoal/\pichgoal.
+        // When embedded in a Word shape, the shape stores the same image more
+        // than once (pib source, \result, legacy fallbacks). Render only the
+        // first; later copies would stack as duplicates on the page.
         const shp = findParentDestination(this.parser, "shpinst") as any as ShpInstDestination;
-        if (shp != null && shp.shapeWidth > 0 && shp.shapeHeight > 0) {
-            this._displaysize = { width: shp.shapeWidth, height: shp.shapeHeight };
+        if (shp != null) {
+            if (!shp.claimPicture()) {
+                delete this.text;
+                return { isLegacy, element: null };
+            }
+            // The shape's bounding box is the real display size — the picture
+            // is scaled into it — so prefer it over the picture's own
+            // \picwgoal/\pichgoal.
+            if (shp.shapeWidth > 0 && shp.shapeHeight > 0) {
+                this._displaysize = { width: shp.shapeWidth, height: shp.shapeHeight };
+            }
         }
 
         const type = this._type;
