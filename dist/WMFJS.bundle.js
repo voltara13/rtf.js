@@ -967,6 +967,22 @@ var GDIContext = /** @class */ (function () {
         var opts = this._applyOpts(null, true, true, false);
         this._svg.rect(this.state._svggroup, left, top, right - left, bottom - top, rw / 2, rh / 2, opts);
     };
+    GDIContext.prototype.patBlt = function (x, y, w, h, rop) {
+        _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper.log("[gdi] patBlt: x=" + x + " y=" + y + " w=" + w + " h=" + h
+            + " rop=0x" + rop.toString(16) + " with brush " + this.state.selected.brush.toString());
+        var left = this._todevX(x);
+        var top = this._todevY(y);
+        var width = this._todevW(w);
+        var height = this._todevH(h);
+        _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper.log("[gdi] patBlt: TRANSLATED: left=" + left + " top=" + top
+            + " width=" + width + " height=" + height);
+        this._pushGroup();
+        // PATCOPY paints the rectangle with the current brush. Render that as a
+        // brush-filled rectangle with no border. Other raster operations are
+        // not supported and fall back to the same plain brush fill.
+        var opts = this._applyOpts(null, false, true, false);
+        this._svg.rect(this.state._svggroup, left, top, width, height, 0, 0, opts);
+    };
     GDIContext.prototype.textOut = function (x, y, text) {
         _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper.log("[gdi] textOut: x=" + x + " y=" + y + " text=" + text
             + " with font " + this.state.selected.font.toString());
@@ -3114,19 +3130,32 @@ var WMFRecords = /** @class */ (function () {
                     });
                     break;
                 }
-                case _Helper__WEBPACK_IMPORTED_MODULE_2__.Helper.GDI.RecordType.META_LINETO: {
+                case _Helper__WEBPACK_IMPORTED_MODULE_2__.Helper.GDI.RecordType.META_PATBLT: {
+                    // RasterOperation (DWORD), Height, Width, YLeft, XLeft.
+                    // Used by Office to paint shape shadows with the current brush.
+                    var rop_1 = reader.readUint32();
+                    var height_2 = reader.readInt16();
+                    var width_2 = reader.readInt16();
                     var y_5 = reader.readInt16();
                     var x_5 = reader.readInt16();
                     this_1._records.push(function (gdi) {
-                        gdi.lineTo(x_5, y_5);
+                        gdi.patBlt(x_5, y_5, width_2, height_2, rop_1);
+                    });
+                    break;
+                }
+                case _Helper__WEBPACK_IMPORTED_MODULE_2__.Helper.GDI.RecordType.META_LINETO: {
+                    var y_6 = reader.readInt16();
+                    var x_6 = reader.readInt16();
+                    this_1._records.push(function (gdi) {
+                        gdi.lineTo(x_6, y_6);
                     });
                     break;
                 }
                 case _Helper__WEBPACK_IMPORTED_MODULE_2__.Helper.GDI.RecordType.META_MOVETO: {
-                    var y_6 = reader.readInt16();
-                    var x_6 = reader.readInt16();
+                    var y_7 = reader.readInt16();
+                    var x_7 = reader.readInt16();
                     this_1._records.push(function (gdi) {
-                        gdi.moveTo(x_6, y_6);
+                        gdi.moveTo(x_7, y_7);
                     });
                     break;
                 }
@@ -3135,17 +3164,17 @@ var WMFRecords = /** @class */ (function () {
                     if (len > 0) {
                         var text_1 = reader.readString(len);
                         reader.skip(len % 2);
-                        var y_7 = reader.readInt16();
-                        var x_7 = reader.readInt16();
+                        var y_8 = reader.readInt16();
+                        var x_8 = reader.readInt16();
                         this_1._records.push(function (gdi) {
-                            gdi.textOut(x_7, y_7, text_1);
+                            gdi.textOut(x_8, y_8, text_1);
                         });
                     }
                     break;
                 }
                 case _Helper__WEBPACK_IMPORTED_MODULE_2__.Helper.GDI.RecordType.META_EXTTEXTOUT: {
-                    var y_8 = reader.readInt16();
-                    var x_8 = reader.readInt16();
+                    var y_9 = reader.readInt16();
+                    var x_9 = reader.readInt16();
                     var len = reader.readInt16();
                     var fwOpts_1 = reader.readUint16();
                     var hasRect = null;
@@ -3177,7 +3206,7 @@ var WMFRecords = /** @class */ (function () {
                             }
                         }
                         this_1._records.push(function (gdi) {
-                            gdi.extTextOut(x_8, y_8, text_2, fwOpts_1, rect_3, dx_1);
+                            gdi.extTextOut(x_9, y_9, text_2, fwOpts_1, rect_3, dx_1);
                         });
                     }
                     break;
@@ -3302,7 +3331,6 @@ var WMFRecords = /** @class */ (function () {
                 case _Helper__WEBPACK_IMPORTED_MODULE_2__.Helper.GDI.RecordType.META_ANIMATEPALETTE:
                 case _Helper__WEBPACK_IMPORTED_MODULE_2__.Helper.GDI.RecordType.META_EXTFLOODFILL:
                 case _Helper__WEBPACK_IMPORTED_MODULE_2__.Helper.GDI.RecordType.META_SETPIXEL:
-                case _Helper__WEBPACK_IMPORTED_MODULE_2__.Helper.GDI.RecordType.META_PATBLT:
                 case _Helper__WEBPACK_IMPORTED_MODULE_2__.Helper.GDI.RecordType.META_PIE:
                 case _Helper__WEBPACK_IMPORTED_MODULE_2__.Helper.GDI.RecordType.META_STRETCHBLT:
                 case _Helper__WEBPACK_IMPORTED_MODULE_2__.Helper.GDI.RecordType.META_INVERTREGION:

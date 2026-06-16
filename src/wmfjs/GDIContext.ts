@@ -319,6 +319,24 @@ export class GDIContext {
         this._svg.rect(this.state._svggroup, left, top, right - left, bottom - top, rw / 2, rh / 2, opts);
     }
 
+    public patBlt(x: number, y: number, w: number, h: number, rop: number): void {
+        Helper.log("[gdi] patBlt: x=" + x + " y=" + y + " w=" + w + " h=" + h
+            + " rop=0x" + rop.toString(16) + " with brush " + this.state.selected.brush.toString());
+        const left = this._todevX(x);
+        const top = this._todevY(y);
+        const width = this._todevW(w);
+        const height = this._todevH(h);
+        Helper.log("[gdi] patBlt: TRANSLATED: left=" + left + " top=" + top
+            + " width=" + width + " height=" + height);
+        this._pushGroup();
+
+        // PATCOPY paints the rectangle with the current brush. Render that as a
+        // brush-filled rectangle with no border. Other raster operations are
+        // not supported and fall back to the same plain brush fill.
+        const opts = this._applyOpts(null, false, true, false);
+        this._svg.rect(this.state._svggroup, left, top, width, height, 0, 0, opts);
+    }
+
     public textOut(x: number, y: number, text: string): void {
         Helper.log("[gdi] textOut: x=" + x + " y=" + y + " text=" + text
             + " with font " + this.state.selected.font.toString());

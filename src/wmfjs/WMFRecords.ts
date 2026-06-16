@@ -297,6 +297,19 @@ export class WMFRecords {
                     });
                     break;
                 }
+                case Helper.GDI.RecordType.META_PATBLT: {
+                    // RasterOperation (DWORD), Height, Width, YLeft, XLeft.
+                    // Used by Office to paint shape shadows with the current brush.
+                    const rop = reader.readUint32();
+                    const height = reader.readInt16();
+                    const width = reader.readInt16();
+                    const y = reader.readInt16();
+                    const x = reader.readInt16();
+                    this._records.push((gdi) => {
+                        gdi.patBlt(x, y, width, height, rop);
+                    });
+                    break;
+                }
                 case Helper.GDI.RecordType.META_LINETO: {
                     const y = reader.readInt16();
                     const x = reader.readInt16();
@@ -491,7 +504,6 @@ export class WMFRecords {
                 case Helper.GDI.RecordType.META_ANIMATEPALETTE:
                 case Helper.GDI.RecordType.META_EXTFLOODFILL:
                 case Helper.GDI.RecordType.META_SETPIXEL:
-                case Helper.GDI.RecordType.META_PATBLT:
                 case Helper.GDI.RecordType.META_PIE:
                 case Helper.GDI.RecordType.META_STRETCHBLT:
                 case Helper.GDI.RecordType.META_INVERTREGION:
