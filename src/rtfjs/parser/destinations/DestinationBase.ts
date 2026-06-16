@@ -216,3 +216,19 @@ export class RequiredDestinationFactory extends DestinationFactory<IDestination>
         };
     }
 }
+
+/// A destination that is recognized (so its group is NOT skipped) but whose
+/// own text is discarded. Used for Word shape containers (\shp, \shpinst, \sp,
+/// \sn, \sv): we don't render the shape properties themselves, but keeping the
+/// group "known" lets a \pict nested inside the shape's picture property reach
+/// the picture pipeline instead of being dropped with the unknown group.
+export class GenericTextContainerDestinationFactory extends DestinationFactory<IDestination> {
+    constructor(name: string) {
+        super();
+        this.class = class extends DestinationTextBase implements IDestination {
+            constructor() {
+                super(name);
+            }
+        };
+    }
+}

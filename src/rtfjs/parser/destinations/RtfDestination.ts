@@ -51,10 +51,16 @@ export class RtfDestination extends DestinationBase {
         plain: () => {
             Helper.log("[rtf] reset to character defaults");
             this.parser.state.chp = new Chp(null);
+            // Emit a render instruction so the reset actually reaches the
+            // output; otherwise runs that rely on a style for their size
+            // (e.g. \pard\plain \s15 with no explicit \fs) keep the previous
+            // run's character formatting.
+            this._addFormatIns("chp", this.parser.state.chp);
         },
         pard: () => {
             Helper.log("[rtf] reset to paragraph defaults");
             this.parser.state.pap = new Pap(null);
+            this._addFormatIns("pap", this.parser.state.pap);
         },
         b: this._genericFormatOnOff("chp", "bold"),
         i: this._genericFormatOnOff("chp", "italic"),
@@ -125,6 +131,24 @@ export class RtfDestination extends DestinationBase {
         }),
         line: this._addInsHandler((renderer) => {
             renderer.lineBreak();
+        }),
+        intbl: this._addInsHandler((renderer) => {
+            renderer.setInTable(true);
+        }),
+        trowd: this._addInsHandler((renderer) => {
+            renderer.setInTable(true);
+        }),
+        cell: this._addInsHandler((renderer) => {
+            renderer.cellBreak();
+        }),
+        nestcell: this._addInsHandler((renderer) => {
+            renderer.cellBreak();
+        }),
+        row: this._addInsHandler((renderer) => {
+            renderer.rowBreak();
+        }),
+        nestrow: this._addInsHandler((renderer) => {
+            renderer.rowBreak();
         }),
     };
 

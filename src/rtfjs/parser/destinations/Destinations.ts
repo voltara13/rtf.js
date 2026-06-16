@@ -31,6 +31,7 @@ import {
     DestinationFactory,
     GenericPropertyDestinationFactory,
     GenericSubTextPropertyDestinationFactory,
+    GenericTextContainerDestinationFactory,
     RequiredDestinationFactory,
 } from "./DestinationBase";
 import { FieldDestination, FldinstDestination, FldrsltDestination } from "./FieldDestinations";
@@ -83,6 +84,14 @@ export const Destinations
     pict: PictDestination,
     shppict: new PictGroupDestinationFactory(false),
     nonshppict: new PictGroupDestinationFactory(true),
+    // Word drawing-object (shape) containers. Recognized so they are not
+    // skipped, which lets a \pict embedded in the shape's "pib" property
+    // (\shp > \shpinst > \sp > \sv) render instead of being dropped.
+    shp: new GenericTextContainerDestinationFactory("shp"),
+    shpinst: new GenericTextContainerDestinationFactory("shpinst"),
+    sp: new GenericTextContainerDestinationFactory("sp"),
+    sn: new GenericTextContainerDestinationFactory("sn"),
+    sv: new GenericTextContainerDestinationFactory("sv"),
     private1: new RequiredDestinationFactory("private1"),
     rxe: new RequiredDestinationFactory("rxe"),
     tc: new RequiredDestinationFactory("tc"),

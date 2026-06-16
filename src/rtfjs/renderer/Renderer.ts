@@ -44,6 +44,14 @@ export class Renderer {
     private _cursubpar: HTMLElement;
     private _curcont: IContainerElement[];
 
+    // Table rendering state. RTF marks table paragraphs with \intbl and ends
+    // cells/rows with \cell/\row; rtf.js upstream ignores these, so we build
+    // real <table>/<tr>/<td> elements here.
+    private _intbl: boolean;
+    private _curtable: HTMLTableElement;
+    private _currow: HTMLTableRowElement;
+    private _cellpars: HTMLElement[];
+
     constructor(doc: Document) {
         this._doc = doc;
         this._dom = null;
@@ -53,6 +61,11 @@ export class Renderer {
         this._curpar = null;
         this._cursubpar = null;
         this._curcont = [];
+
+        this._intbl = false;
+        this._curtable = null;
+        this._currow = null;
+        this._cellpars = [];
     }
 
     public pushContainer(contel: IContainerElement): void {
@@ -119,6 +132,10 @@ export class Renderer {
     }
 
     public startPar(): void {
+        // A non-table paragraph after a table means the table is finished.
+        if (!this._intbl && this._curtable != null) {
+            this._closeTable();
+        }
         this._curpar = document.createElement("div");
         if (this._curRPap != null) {
             this._curRPap.apply(this._doc, this._curpar, this._curRChp, true);
@@ -126,7 +143,69 @@ export class Renderer {
         }
         this._cursubpar = null;
         this._curcont = [];
-        this._dom.push(this._curpar);
+        if (this._intbl) {
+            // Collect into the current cell instead of the document body.
+            this._cellpars.push(this._curpar);
+        } else {
+            this._dom.push(this._curpar);
+        }
+    }
+
+    public setInTable(intbl: boolean): void {
+        this._intbl = intbl;
+    }
+
+    // Ends the current table cell (\cell): wraps the accumulated paragraph(s)
+    // into a <td> appended to the current row.
+    public cellBreak(): void {
+        this._ensureRow();
+        const cell: HTMLTableCellElement = document.createElement("td");
+        if (this._curpar != null && this._cellpars.indexOf(this._curpar) < 0) {
+            this._cellpars.push(this._curpar);
+        }
+        if (this._cellpars.length === 0) {
+            this._cellpars.push(document.createElement("div"));
+        }
+        for (const par of this._cellpars) {
+            cell.append(par);
+        }
+        this._currow.append(cell);
+        this._cellpars = [];
+        this._curpar = null;
+        this._cursubpar = null;
+        this._curcont = [];
+    }
+
+    // Ends the current table row (\row). Leaves the table open so following
+    // rows append to it; clearing _intbl lets a non-table paragraph close it.
+    public rowBreak(): void {
+        if (this._curpar != null || this._cellpars.length > 0) {
+            this.cellBreak();
+        }
+        this._currow = null;
+        this._intbl = false;
+    }
+
+    private _ensureTable(): void {
+        if (this._curtable == null) {
+            this._curtable = document.createElement("table");
+            this._curtable.className = "rtf-table";
+            this._dom.push(this._curtable);
+        }
+    }
+
+    private _ensureRow(): void {
+        this._ensureTable();
+        if (this._currow == null) {
+            this._currow = document.createElement("tr");
+            this._curtable.append(this._currow);
+        }
+    }
+
+    private _closeTable(): void {
+        this._curtable = null;
+        this._currow = null;
+        this._cellpars = [];
     }
 
     public lineBreak(): void {
@@ -194,6 +273,10 @@ export class Renderer {
         this._curRChp = null;
         this._curRPap = null;
         this._curpar = null;
+        this._intbl = false;
+        this._curtable = null;
+        this._currow = null;
+        this._cellpars = [];
 
         const len = this._doc._ins.length;
         for (let i = 0; i < len; i++) {

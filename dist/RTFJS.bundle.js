@@ -6057,12 +6057,18 @@ var Parser = /** @class */ (function () {
         }
         this.parser.state = state.parent;
         if (this.parser.state !== null) {
-            var currentState_1 = this.parser.state;
+            // Snapshot the parent's formatting NOW. The state object is reused
+            // and its chp/pap get mutated as parsing continues, so capturing it
+            // by reference (and reading it lazily at render time) would make
+            // every group-close restore the document's final formatting instead
+            // of the formatting in effect when the group actually closed.
+            var chp_1 = new _renderer_RenderChp__WEBPACK_IMPORTED_MODULE_2__.RenderChp(new _Containers__WEBPACK_IMPORTED_MODULE_4__.Chp(this.parser.state.chp));
+            var pap_1 = new _renderer_RenderPap__WEBPACK_IMPORTED_MODULE_3__.RenderPap(new _Containers__WEBPACK_IMPORTED_MODULE_4__.Pap(this.parser.state.pap));
             this.inst._ins.push(function (renderer) {
-                renderer.setChp(new _renderer_RenderChp__WEBPACK_IMPORTED_MODULE_2__.RenderChp(currentState_1.chp));
+                renderer.setChp(chp_1);
             });
             this.inst._ins.push(function (renderer) {
-                renderer.setPap(new _renderer_RenderPap__WEBPACK_IMPORTED_MODULE_3__.RenderPap(currentState_1.pap));
+                renderer.setPap(pap_1);
             });
         }
         return this.parser.state;
@@ -6552,6 +6558,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "DestinationTextBase": () => (/* binding */ DestinationTextBase),
 /* harmony export */   "GenericPropertyDestinationFactory": () => (/* binding */ GenericPropertyDestinationFactory),
 /* harmony export */   "GenericSubTextPropertyDestinationFactory": () => (/* binding */ GenericSubTextPropertyDestinationFactory),
+/* harmony export */   "GenericTextContainerDestinationFactory": () => (/* binding */ GenericTextContainerDestinationFactory),
 /* harmony export */   "RequiredDestinationFactory": () => (/* binding */ RequiredDestinationFactory),
 /* harmony export */   "findParentDestination": () => (/* binding */ findParentDestination)
 /* harmony export */ });
@@ -6755,6 +6762,27 @@ var RequiredDestinationFactory = /** @class */ (function (_super) {
     return RequiredDestinationFactory;
 }(DestinationFactory));
 
+/// A destination that is recognized (so its group is NOT skipped) but whose
+/// own text is discarded. Used for Word shape containers (\shp, \shpinst, \sp,
+/// \sn, \sv): we don't render the shape properties themselves, but keeping the
+/// group "known" lets a \pict nested inside the shape's picture property reach
+/// the picture pipeline instead of being dropped with the unknown group.
+var GenericTextContainerDestinationFactory = /** @class */ (function (_super) {
+    __extends(GenericTextContainerDestinationFactory, _super);
+    function GenericTextContainerDestinationFactory(name) {
+        var _this = _super.call(this) || this;
+        _this.class = /** @class */ (function (_super) {
+            __extends(class_4, _super);
+            function class_4() {
+                return _super.call(this, name) || this;
+            }
+            return class_4;
+        }(DestinationTextBase));
+        return _this;
+    }
+    return GenericTextContainerDestinationFactory;
+}(DestinationFactory));
+
 
 
 /***/ }),
@@ -6848,6 +6876,14 @@ var Destinations = {
     pict: _PictDestinations__WEBPACK_IMPORTED_MODULE_5__.PictDestination,
     shppict: new _PictDestinations__WEBPACK_IMPORTED_MODULE_5__.PictGroupDestinationFactory(false),
     nonshppict: new _PictDestinations__WEBPACK_IMPORTED_MODULE_5__.PictGroupDestinationFactory(true),
+    // Word drawing-object (shape) containers. Recognized so they are not
+    // skipped, which lets a \pict embedded in the shape's "pib" property
+    // (\shp > \shpinst > \sp > \sv) render instead of being dropped.
+    shp: new _DestinationBase__WEBPACK_IMPORTED_MODULE_1__.GenericTextContainerDestinationFactory("shp"),
+    shpinst: new _DestinationBase__WEBPACK_IMPORTED_MODULE_1__.GenericTextContainerDestinationFactory("shpinst"),
+    sp: new _DestinationBase__WEBPACK_IMPORTED_MODULE_1__.GenericTextContainerDestinationFactory("sp"),
+    sn: new _DestinationBase__WEBPACK_IMPORTED_MODULE_1__.GenericTextContainerDestinationFactory("sn"),
+    sv: new _DestinationBase__WEBPACK_IMPORTED_MODULE_1__.GenericTextContainerDestinationFactory("sv"),
     private1: new _DestinationBase__WEBPACK_IMPORTED_MODULE_1__.RequiredDestinationFactory("private1"),
     rxe: new _DestinationBase__WEBPACK_IMPORTED_MODULE_1__.RequiredDestinationFactory("rxe"),
     tc: new _DestinationBase__WEBPACK_IMPORTED_MODULE_1__.RequiredDestinationFactory("tc"),
@@ -7953,10 +7989,16 @@ var RtfDestination = /** @class */ (function (_super) {
             plain: function () {
                 _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper.log("[rtf] reset to character defaults");
                 _this.parser.state.chp = new _Containers__WEBPACK_IMPORTED_MODULE_3__.Chp(null);
+                // Emit a render instruction so the reset actually reaches the
+                // output; otherwise runs that rely on a style for their size
+                // (e.g. \pard\plain \s15 with no explicit \fs) keep the previous
+                // run's character formatting.
+                _this._addFormatIns("chp", _this.parser.state.chp);
             },
             pard: function () {
                 _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper.log("[rtf] reset to paragraph defaults");
                 _this.parser.state.pap = new _Containers__WEBPACK_IMPORTED_MODULE_3__.Pap(null);
+                _this._addFormatIns("pap", _this.parser.state.pap);
             },
             b: _this._genericFormatOnOff("chp", "bold"),
             i: _this._genericFormatOnOff("chp", "italic"),
@@ -8025,6 +8067,24 @@ var RtfDestination = /** @class */ (function (_super) {
             }),
             line: _this._addInsHandler(function (renderer) {
                 renderer.lineBreak();
+            }),
+            intbl: _this._addInsHandler(function (renderer) {
+                renderer.setInTable(true);
+            }),
+            trowd: _this._addInsHandler(function (renderer) {
+                renderer.setInTable(true);
+            }),
+            cell: _this._addInsHandler(function (renderer) {
+                renderer.cellBreak();
+            }),
+            nestcell: _this._addInsHandler(function (renderer) {
+                renderer.cellBreak();
+            }),
+            row: _this._addInsHandler(function (renderer) {
+                renderer.rowBreak();
+            }),
+            nestrow: _this._addInsHandler(function (renderer) {
+                renderer.rowBreak();
             }),
         };
         if (parser.version != null) {
@@ -8347,9 +8407,15 @@ var RenderChp = /** @class */ (function () {
             el.style.fontStyle = "italic";
         }
         if (Object.prototype.hasOwnProperty.call(this._chp, "fontfamily") && doc._fonts[this._chp.fontfamily]) {
-            var fontFamily = doc._fonts[this._chp.fontfamily].fontname.replace(";", "");
+            var font = doc._fonts[this._chp.fontfamily];
+            var fontFamily = font.fontname.replace(";", "");
             if (fontFamily !== "Symbol") {
-                el.style.fontFamily = fontFamily;
+                // Append a generic CSS family so the run still reads as
+                // serif/sans/mono on platforms that lack the named Windows
+                // font (e.g. Android/Aurora have no "Times New Roman").
+                var generic = RenderChp._genericFamily(font.family, font.pitch);
+                var quoted = /[\s,"]/.test(fontFamily) ? '"' + fontFamily.replace(/"/g, "") + '"' : fontFamily;
+                el.style.fontFamily = generic != null ? quoted + ", " + generic : quoted;
             }
         }
         var deco = [];
@@ -8383,6 +8449,27 @@ var RenderChp = /** @class */ (function () {
         }
         if (this._chp.supersubscript === _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper.SUPERSUBSCRIPT.SUPERSCRIPT || this._chp.supersubscript === _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper.SUPERSUBSCRIPT.SUBSCRIPT) {
             el.style.fontSize = Math.floor((this._chp.fontsize / 2) - 2) + "pt";
+        }
+    };
+    // Maps an RTF font family class (\froman, \fswiss, ...) and pitch to a
+    // generic CSS family used as a fallback. Fixed pitch implies monospace.
+    RenderChp._genericFamily = function (family, pitch) {
+        if (pitch === _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper.FONTPITCH.FIXED) {
+            return "monospace";
+        }
+        switch (family) {
+            case "roman":
+                return "serif";
+            case "swiss":
+                return "sans-serif";
+            case "modern":
+                return "monospace";
+            case "script":
+                return "cursive";
+            case "decor":
+                return "fantasy";
+            default:
+                return null;
         }
     };
     return RenderChp;
@@ -8525,6 +8612,10 @@ var Renderer = /** @class */ (function () {
         this._curpar = null;
         this._cursubpar = null;
         this._curcont = [];
+        this._intbl = false;
+        this._curtable = null;
+        this._currow = null;
+        this._cellpars = [];
     }
     Renderer.prototype.pushContainer = function (contel) {
         if (this._curpar == null) {
@@ -8589,6 +8680,10 @@ var Renderer = /** @class */ (function () {
         }
     };
     Renderer.prototype.startPar = function () {
+        // A non-table paragraph after a table means the table is finished.
+        if (!this._intbl && this._curtable != null) {
+            this._closeTable();
+        }
         this._curpar = document.createElement("div");
         if (this._curRPap != null) {
             this._curRPap.apply(this._doc, this._curpar, this._curRChp, true);
@@ -8596,7 +8691,65 @@ var Renderer = /** @class */ (function () {
         }
         this._cursubpar = null;
         this._curcont = [];
-        this._dom.push(this._curpar);
+        if (this._intbl) {
+            // Collect into the current cell instead of the document body.
+            this._cellpars.push(this._curpar);
+        }
+        else {
+            this._dom.push(this._curpar);
+        }
+    };
+    Renderer.prototype.setInTable = function (intbl) {
+        this._intbl = intbl;
+    };
+    // Ends the current table cell (\cell): wraps the accumulated paragraph(s)
+    // into a <td> appended to the current row.
+    Renderer.prototype.cellBreak = function () {
+        this._ensureRow();
+        var cell = document.createElement("td");
+        if (this._curpar != null && this._cellpars.indexOf(this._curpar) < 0) {
+            this._cellpars.push(this._curpar);
+        }
+        if (this._cellpars.length === 0) {
+            this._cellpars.push(document.createElement("div"));
+        }
+        for (var _i = 0, _a = this._cellpars; _i < _a.length; _i++) {
+            var par = _a[_i];
+            cell.append(par);
+        }
+        this._currow.append(cell);
+        this._cellpars = [];
+        this._curpar = null;
+        this._cursubpar = null;
+        this._curcont = [];
+    };
+    // Ends the current table row (\row). Leaves the table open so following
+    // rows append to it; clearing _intbl lets a non-table paragraph close it.
+    Renderer.prototype.rowBreak = function () {
+        if (this._curpar != null || this._cellpars.length > 0) {
+            this.cellBreak();
+        }
+        this._currow = null;
+        this._intbl = false;
+    };
+    Renderer.prototype._ensureTable = function () {
+        if (this._curtable == null) {
+            this._curtable = document.createElement("table");
+            this._curtable.className = "rtf-table";
+            this._dom.push(this._curtable);
+        }
+    };
+    Renderer.prototype._ensureRow = function () {
+        this._ensureTable();
+        if (this._currow == null) {
+            this._currow = document.createElement("tr");
+            this._curtable.append(this._currow);
+        }
+    };
+    Renderer.prototype._closeTable = function () {
+        this._curtable = null;
+        this._currow = null;
+        this._cellpars = [];
     };
     Renderer.prototype.lineBreak = function () {
         this._appendToPar(null, true);
@@ -8655,6 +8808,10 @@ var Renderer = /** @class */ (function () {
         this._curRChp = null;
         this._curRPap = null;
         this._curpar = null;
+        this._intbl = false;
+        this._curtable = null;
+        this._currow = null;
+        this._cellpars = [];
         var len = this._doc._ins.length;
         for (var i = 0; i < len; i++) {
             var ins = this._doc._ins[i];

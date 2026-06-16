@@ -45,9 +45,15 @@ export class RenderChp {
             el.style.fontStyle = "italic";
         }
         if (Object.prototype.hasOwnProperty.call(this._chp, "fontfamily") && doc._fonts[this._chp.fontfamily]) {
-            const fontFamily = doc._fonts[this._chp.fontfamily].fontname.replace(";", "");
+            const font = doc._fonts[this._chp.fontfamily];
+            const fontFamily = font.fontname.replace(";", "");
             if (fontFamily !== "Symbol") {
-                el.style.fontFamily = fontFamily;
+                // Append a generic CSS family so the run still reads as
+                // serif/sans/mono on platforms that lack the named Windows
+                // font (e.g. Android/Aurora have no "Times New Roman").
+                const generic = RenderChp._genericFamily(font.family, font.pitch);
+                const quoted = /[\s,"]/.test(fontFamily) ? '"' + fontFamily.replace(/"/g, "") + '"' : fontFamily;
+                el.style.fontFamily = generic != null ? quoted + ", " + generic : quoted;
             }
         }
 
@@ -84,6 +90,28 @@ export class RenderChp {
 
         if (this._chp.supersubscript === Helper.SUPERSUBSCRIPT.SUPERSCRIPT || this._chp.supersubscript === Helper.SUPERSUBSCRIPT.SUBSCRIPT) {
             el.style.fontSize = Math.floor((this._chp.fontsize / 2) - 2) + "pt"
+        }
+    }
+
+    // Maps an RTF font family class (\froman, \fswiss, ...) and pitch to a
+    // generic CSS family used as a fallback. Fixed pitch implies monospace.
+    private static _genericFamily(family: string, pitch: number): string | null {
+        if (pitch === Helper.FONTPITCH.FIXED) {
+            return "monospace";
+        }
+        switch (family) {
+            case "roman":
+                return "serif";
+            case "swiss":
+                return "sans-serif";
+            case "modern":
+                return "monospace";
+            case "script":
+                return "cursive";
+            case "decor":
+                return "fantasy";
+            default:
+                return null;
         }
     }
 }

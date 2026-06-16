@@ -30,7 +30,7 @@ import { Helper, RTFJSError } from "../Helper";
 import { RenderChp } from "../renderer/RenderChp";
 import { Renderer } from "../renderer/Renderer";
 import { RenderPap } from "../renderer/RenderPap";
-import { GlobalState, HexText, PlainText, State } from "./Containers";
+import { Chp, GlobalState, HexText, Pap, PlainText, State } from "./Containers";
 import { DestinationFactory } from "./destinations/DestinationBase";
 import { Destinations } from "./destinations/Destinations";
 import { FonttblDestinationSub } from "./destinations/FonttblDestinations"
@@ -199,12 +199,18 @@ export class Parser {
         this.parser.state = state.parent;
 
         if (this.parser.state !== null) {
-            const currentState = this.parser.state;
+            // Snapshot the parent's formatting NOW. The state object is reused
+            // and its chp/pap get mutated as parsing continues, so capturing it
+            // by reference (and reading it lazily at render time) would make
+            // every group-close restore the document's final formatting instead
+            // of the formatting in effect when the group actually closed.
+            const chp = new RenderChp(new Chp(this.parser.state.chp));
+            const pap = new RenderPap(new Pap(this.parser.state.pap));
             this.inst._ins.push((renderer) => {
-                renderer.setChp(new RenderChp(currentState.chp));
+                renderer.setChp(chp);
             });
             this.inst._ins.push((renderer) => {
-                renderer.setPap(new RenderPap(currentState.pap));
+                renderer.setPap(pap);
             });
         }
         return this.parser.state;
