@@ -8540,6 +8540,25 @@ var RenderPap = /** @class */ (function () {
             if (rchp != null) {
                 el.style.minHeight = Math.floor(rchp._chp.fontsize / 2) + "pt";
             }
+            // Paragraph indents (\li, \ri, \fi), in twips.
+            if (this._pap.indent.left !== 0) {
+                el.style.marginLeft = _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper._twipsToPt(this._pap.indent.left) + "pt";
+            }
+            else {
+                el.style.marginLeft = "";
+            }
+            if (this._pap.indent.right !== 0) {
+                el.style.marginRight = _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper._twipsToPt(this._pap.indent.right) + "pt";
+            }
+            else {
+                el.style.marginRight = "";
+            }
+            if (this._pap.indent.firstline !== 0) {
+                el.style.textIndent = _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper._twipsToPt(this._pap.indent.firstline) + "pt";
+            }
+            else {
+                el.style.textIndent = "";
+            }
         }
         else {
             switch (this._pap.justification) {
