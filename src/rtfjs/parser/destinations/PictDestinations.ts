@@ -36,6 +36,48 @@ export interface IPictGroupDestination extends IDestination {
     isLegacy(): boolean;
 }
 
+// Word drawing-object instance (\shpinst). Captures the shape's bounding box
+// (\shpleft/top/right/bottom, in twips) so a \pict embedded in its "pib"
+// property can be displayed at the shape's size rather than the picture's own
+// goal size. Other keywords/text are consumed so the group is not skipped and
+// the nested \pict still renders.
+export class ShpInstDestination extends DestinationTextBase {
+    private _left: number = null;
+    private _top: number = null;
+    private _right: number = null;
+    private _bottom: number = null;
+
+    constructor(parser?: GlobalState, inst?: Document, name?: string, param?: number) {
+        super("shpinst");
+    }
+
+    public handleKeyword(keyword: string, param: number): boolean {
+        switch (keyword) {
+            case "shpleft":
+                this._left = param;
+                return true;
+            case "shptop":
+                this._top = param;
+                return true;
+            case "shpright":
+                this._right = param;
+                return true;
+            case "shpbottom":
+                this._bottom = param;
+                return true;
+        }
+        return true;
+    }
+
+    public get shapeWidth(): number {
+        return (this._left != null && this._right != null) ? this._right - this._left : null;
+    }
+
+    public get shapeHeight(): number {
+        return (this._top != null && this._bottom != null) ? this._bottom - this._top : null;
+    }
+}
+
 export class PictGroupDestinationFactory extends DestinationFactory<IPictGroupDestination> {
     constructor(legacy: boolean) {
         super();
@@ -208,6 +250,14 @@ export class PictDestination extends DestinationTextBase {
 
         const pictGroup = findParentDestination(this.parser, "pict-group") as any as IPictGroupDestination;
         const isLegacy = (pictGroup != null ? pictGroup.isLegacy() : null);
+
+        // When embedded in a Word shape, the shape's bounding box is the real
+        // display size — the picture is scaled into it — so prefer it over the
+        // picture's own \picwgoal/\pichgoal.
+        const shp = findParentDestination(this.parser, "shpinst") as any as ShpInstDestination;
+        if (shp != null && shp.shapeWidth > 0 && shp.shapeHeight > 0) {
+            this._displaysize = { width: shp.shapeWidth, height: shp.shapeHeight };
+        }
 
         const type = this._type;
         if (typeof type === "function") {

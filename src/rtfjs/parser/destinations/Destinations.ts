@@ -39,7 +39,7 @@ import { FonttblDestination } from "./FonttblDestinations";
 import { InfoDestination,
     MetaPropertyDestinationFactory,
     MetaPropertyTimeDestinationFactory } from "./MetaDestinations";
-import { PictDestination, PictGroupDestinationFactory } from "./PictDestinations";
+import { PictDestination, PictGroupDestinationFactory, ShpInstDestination } from "./PictDestinations";
 import { RtfDestination } from "./RtfDestination";
 import { StylesheetDestination } from "./StylesheetDestination";
 
@@ -88,7 +88,7 @@ export const Destinations
     // skipped, which lets a \pict embedded in the shape's "pib" property
     // (\shp > \shpinst > \sp > \sv) render instead of being dropped.
     shp: new GenericTextContainerDestinationFactory("shp"),
-    shpinst: new GenericTextContainerDestinationFactory("shpinst"),
+    shpinst: ShpInstDestination,
     sp: new GenericTextContainerDestinationFactory("sp"),
     sn: new GenericTextContainerDestinationFactory("sn"),
     sv: new GenericTextContainerDestinationFactory("sv"),

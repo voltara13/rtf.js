@@ -6890,7 +6890,7 @@ var Destinations = {
     // skipped, which lets a \pict embedded in the shape's "pib" property
     // (\shp > \shpinst > \sp > \sv) render instead of being dropped.
     shp: new _DestinationBase__WEBPACK_IMPORTED_MODULE_1__.GenericTextContainerDestinationFactory("shp"),
-    shpinst: new _DestinationBase__WEBPACK_IMPORTED_MODULE_1__.GenericTextContainerDestinationFactory("shpinst"),
+    shpinst: _PictDestinations__WEBPACK_IMPORTED_MODULE_5__.ShpInstDestination,
     sp: new _DestinationBase__WEBPACK_IMPORTED_MODULE_1__.GenericTextContainerDestinationFactory("sp"),
     sn: new _DestinationBase__WEBPACK_IMPORTED_MODULE_1__.GenericTextContainerDestinationFactory("sn"),
     sv: new _DestinationBase__WEBPACK_IMPORTED_MODULE_1__.GenericTextContainerDestinationFactory("sv"),
@@ -7578,7 +7578,8 @@ var MetaPropertyTimeDestinationFactory = /** @class */ (function (_super) {
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "PictDestination": () => (/* binding */ PictDestination),
-/* harmony export */   "PictGroupDestinationFactory": () => (/* binding */ PictGroupDestinationFactory)
+/* harmony export */   "PictGroupDestinationFactory": () => (/* binding */ PictGroupDestinationFactory),
+/* harmony export */   "ShpInstDestination": () => (/* binding */ ShpInstDestination)
 /* harmony export */ });
 /* harmony import */ var EMFJS__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! EMFJS */ "EMFJS");
 /* harmony import */ var EMFJS__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(EMFJS__WEBPACK_IMPORTED_MODULE_0__);
@@ -7629,6 +7630,55 @@ var __extends = (undefined && undefined.__extends) || (function () {
 
 
 
+
+// Word drawing-object instance (\shpinst). Captures the shape's bounding box
+// (\shpleft/top/right/bottom, in twips) so a \pict embedded in its "pib"
+// property can be displayed at the shape's size rather than the picture's own
+// goal size. Other keywords/text are consumed so the group is not skipped and
+// the nested \pict still renders.
+var ShpInstDestination = /** @class */ (function (_super) {
+    __extends(ShpInstDestination, _super);
+    function ShpInstDestination(parser, inst, name, param) {
+        var _this = _super.call(this, "shpinst") || this;
+        _this._left = null;
+        _this._top = null;
+        _this._right = null;
+        _this._bottom = null;
+        return _this;
+    }
+    ShpInstDestination.prototype.handleKeyword = function (keyword, param) {
+        switch (keyword) {
+            case "shpleft":
+                this._left = param;
+                return true;
+            case "shptop":
+                this._top = param;
+                return true;
+            case "shpright":
+                this._right = param;
+                return true;
+            case "shpbottom":
+                this._bottom = param;
+                return true;
+        }
+        return true;
+    };
+    Object.defineProperty(ShpInstDestination.prototype, "shapeWidth", {
+        get: function () {
+            return (this._left != null && this._right != null) ? this._right - this._left : null;
+        },
+        enumerable: false,
+        configurable: true
+    });
+    Object.defineProperty(ShpInstDestination.prototype, "shapeHeight", {
+        get: function () {
+            return (this._top != null && this._bottom != null) ? this._bottom - this._top : null;
+        },
+        enumerable: false,
+        configurable: true
+    });
+    return ShpInstDestination;
+}(_DestinationBase__WEBPACK_IMPORTED_MODULE_3__.DestinationTextBase));
 
 var PictGroupDestinationFactory = /** @class */ (function (_super) {
     __extends(PictGroupDestinationFactory, _super);
@@ -7798,6 +7848,13 @@ var PictDestination = /** @class */ (function (_super) {
         }
         var pictGroup = (0,_DestinationBase__WEBPACK_IMPORTED_MODULE_3__.findParentDestination)(this.parser, "pict-group");
         var isLegacy = (pictGroup != null ? pictGroup.isLegacy() : null);
+        // When embedded in a Word shape, the shape's bounding box is the real
+        // display size — the picture is scaled into it — so prefer it over the
+        // picture's own \picwgoal/\pichgoal.
+        var shp = (0,_DestinationBase__WEBPACK_IMPORTED_MODULE_3__.findParentDestination)(this.parser, "shpinst");
+        if (shp != null && shp.shapeWidth > 0 && shp.shapeHeight > 0) {
+            this._displaysize = { width: shp.shapeWidth, height: shp.shapeHeight };
+        }
         var type = this._type;
         if (typeof type === "function") {
             // type is the trampoline function that executes the .load function
