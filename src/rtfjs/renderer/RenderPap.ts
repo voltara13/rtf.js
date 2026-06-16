@@ -26,7 +26,7 @@ SOFTWARE.
 
 import { Document } from "../Document";
 import { Helper } from "../Helper";
-import { Pap } from "../parser/Containers";
+import { IBorder, Pap } from "../parser/Containers";
 import { RenderChp } from "./RenderChp";
 
 export class RenderPap {
@@ -69,6 +69,12 @@ export class RenderPap {
             } else {
                 el.style.textIndent = "";
             }
+            // Paragraph borders (\brdrt/b/l/r with \brdrw width, \brdrcf color).
+            const borders = this._pap.borders;
+            this._applyBorder(doc, el, "borderTop", borders.top);
+            this._applyBorder(doc, el, "borderBottom", borders.bottom);
+            this._applyBorder(doc, el, "borderLeft", borders.left);
+            this._applyBorder(doc, el, "borderRight", borders.right);
         } else {
             switch (this._pap.justification) {
                 case Helper.JUSTIFICATION.LEFT:
@@ -85,5 +91,19 @@ export class RenderPap {
                     break;
             }
         }
+    }
+
+    private _applyBorder(doc: Document, el: HTMLElement, prop: string, border: IBorder | null): void {
+        const style = el.style as any;
+        if (border == null || border.width <= 0) {
+            style[prop] = "";
+            return;
+        }
+        let color = "#000000";
+        const c = doc._lookupColor(border.colorindex);
+        if (c != null) {
+            color = Helper._colorToStr(c);
+        }
+        style[prop] = Helper._twipsToPt(border.width) + "pt solid " + color;
     }
 }

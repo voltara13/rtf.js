@@ -5722,6 +5722,12 @@ var Pap = /** @class */ (function () {
             this.spacebefore = parent.spacebefore;
             this.spaceafter = parent.spaceafter;
             this.charactertype = parent.charactertype;
+            this.borders = {
+                top: cloneBorder(parent.borders.top),
+                bottom: cloneBorder(parent.borders.bottom),
+                left: cloneBorder(parent.borders.left),
+                right: cloneBorder(parent.borders.right),
+            };
         }
         else {
             this.indent = {
@@ -5733,11 +5739,15 @@ var Pap = /** @class */ (function () {
             this.spacebefore = 0;
             this.spaceafter = 0;
             this.charactertype = null;
+            this.borders = { top: null, bottom: null, left: null, right: null };
         }
     }
     return Pap;
 }());
 
+function cloneBorder(border) {
+    return border == null ? null : { width: border.width, colorindex: border.colorindex };
+}
 var Sep = /** @class */ (function () {
     function Sep(parent) {
         if (parent != null) {
@@ -7974,6 +7984,9 @@ var RtfDestination = /** @class */ (function (_super) {
     __extends(RtfDestination, _super);
     function RtfDestination(parser, inst, name, param) {
         var _this = _super.call(this, name) || this;
+        // Which paragraph border side (\brdrt/b/l/r) subsequent \brdrw/\brdrcf
+        // properties currently apply to.
+        _this._brdrSide = null;
         _this._charFormatHandlers = {
             ansicpg: function (param) {
                 // if the value is 0, use the default charset as 0 is not valid
@@ -7998,8 +8011,17 @@ var RtfDestination = /** @class */ (function (_super) {
             pard: function () {
                 _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper.log("[rtf] reset to paragraph defaults");
                 _this.parser.state.pap = new _Containers__WEBPACK_IMPORTED_MODULE_3__.Pap(null);
+                _this._brdrSide = null;
                 _this._addFormatIns("pap", _this.parser.state.pap);
             },
+            brdrt: function () { return _this._beginBorder("top"); },
+            brdrb: function () { return _this._beginBorder("bottom"); },
+            brdrl: function () { return _this._beginBorder("left"); },
+            brdrr: function () { return _this._beginBorder("right"); },
+            brdrw: function (param) { return _this._setBorder("width", param); },
+            brdrcf: function (param) { return _this._setBorder("colorindex", param); },
+            brdrnone: function () { return _this._clearBorder(); },
+            brdrnil: function () { return _this._clearBorder(); },
             b: _this._genericFormatOnOff("chp", "bold"),
             i: _this._genericFormatOnOff("chp", "italic"),
             sub: _this._genericFormatSetVal("chp", "supersubscript", _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper.SUPERSUBSCRIPT.SUBSCRIPT),
@@ -8133,6 +8155,32 @@ var RtfDestination = /** @class */ (function (_super) {
         return function (param) {
             _this.inst.addIns(func);
         };
+    };
+    // Selects the paragraph border side that following \brdrw/\brdrcf apply to.
+    RtfDestination.prototype._beginBorder = function (side) {
+        this._brdrSide = side;
+        var borders = this.parser.state.pap.borders;
+        if (borders[side] == null) {
+            borders[side] = { width: 0, colorindex: 0 };
+        }
+    };
+    RtfDestination.prototype._setBorder = function (prop, param) {
+        if (this._brdrSide == null || param == null) {
+            return;
+        }
+        var border = this.parser.state.pap.borders[this._brdrSide];
+        if (border == null) {
+            return;
+        }
+        border[prop] = param;
+        this._addFormatIns("pap", this.parser.state.pap);
+    };
+    RtfDestination.prototype._clearBorder = function () {
+        if (this._brdrSide == null) {
+            return;
+        }
+        this.parser.state.pap.borders[this._brdrSide] = null;
+        this._addFormatIns("pap", this.parser.state.pap);
     };
     RtfDestination.prototype._addFormatIns = function (ptype, props) {
         _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper.log("[rtf] update " + ptype);
@@ -8559,6 +8607,12 @@ var RenderPap = /** @class */ (function () {
             else {
                 el.style.textIndent = "";
             }
+            // Paragraph borders (\brdrt/b/l/r with \brdrw width, \brdrcf color).
+            var borders = this._pap.borders;
+            this._applyBorder(doc, el, "borderTop", borders.top);
+            this._applyBorder(doc, el, "borderBottom", borders.bottom);
+            this._applyBorder(doc, el, "borderLeft", borders.left);
+            this._applyBorder(doc, el, "borderRight", borders.right);
         }
         else {
             switch (this._pap.justification) {
@@ -8576,6 +8630,19 @@ var RenderPap = /** @class */ (function () {
                     break;
             }
         }
+    };
+    RenderPap.prototype._applyBorder = function (doc, el, prop, border) {
+        var style = el.style;
+        if (border == null || border.width <= 0) {
+            style[prop] = "";
+            return;
+        }
+        var color = "#000000";
+        var c = doc._lookupColor(border.colorindex);
+        if (c != null) {
+            color = _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper._colorToStr(c);
+        }
+        style[prop] = _Helper__WEBPACK_IMPORTED_MODULE_0__.Helper._twipsToPt(border.width) + "pt solid " + color;
     };
     return RenderPap;
 }());

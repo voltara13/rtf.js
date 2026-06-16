@@ -36,6 +36,9 @@ export class RtfDestination extends DestinationBase {
     private _metadata: { [key: string]: any };
     private parser: GlobalState;
     private inst: Document;
+    // Which paragraph border side (\brdrt/b/l/r) subsequent \brdrw/\brdrcf
+    // properties currently apply to.
+    private _brdrSide: "top" | "bottom" | "left" | "right" | null = null;
     private _charFormatHandlers: { [key: string]: (param: number) => void } = {
         ansicpg: (param: number) => {
             // if the value is 0, use the default charset as 0 is not valid
@@ -60,8 +63,17 @@ export class RtfDestination extends DestinationBase {
         pard: () => {
             Helper.log("[rtf] reset to paragraph defaults");
             this.parser.state.pap = new Pap(null);
+            this._brdrSide = null;
             this._addFormatIns("pap", this.parser.state.pap);
         },
+        brdrt: () => this._beginBorder("top"),
+        brdrb: () => this._beginBorder("bottom"),
+        brdrl: () => this._beginBorder("left"),
+        brdrr: () => this._beginBorder("right"),
+        brdrw: (param: number) => this._setBorder("width", param),
+        brdrcf: (param: number) => this._setBorder("colorindex", param),
+        brdrnone: () => this._clearBorder(),
+        brdrnil: () => this._clearBorder(),
         b: this._genericFormatOnOff("chp", "bold"),
         i: this._genericFormatOnOff("chp", "italic"),
         sub: this._genericFormatSetVal("chp", "supersubscript", Helper.SUPERSUBSCRIPT.SUBSCRIPT),
@@ -207,6 +219,35 @@ export class RtfDestination extends DestinationBase {
         return (param: number) => {
             this.inst.addIns(func);
         };
+    }
+
+    // Selects the paragraph border side that following \brdrw/\brdrcf apply to.
+    private _beginBorder(side: "top" | "bottom" | "left" | "right"): void {
+        this._brdrSide = side;
+        const borders = this.parser.state.pap.borders;
+        if (borders[side] == null) {
+            borders[side] = { width: 0, colorindex: 0 };
+        }
+    }
+
+    private _setBorder(prop: "width" | "colorindex", param: number): void {
+        if (this._brdrSide == null || param == null) {
+            return;
+        }
+        const border = this.parser.state.pap.borders[this._brdrSide];
+        if (border == null) {
+            return;
+        }
+        border[prop] = param;
+        this._addFormatIns("pap", this.parser.state.pap);
+    }
+
+    private _clearBorder(): void {
+        if (this._brdrSide == null) {
+            return;
+        }
+        this.parser.state.pap.borders[this._brdrSide] = null;
+        this._addFormatIns("pap", this.parser.state.pap);
     }
 
     private _addFormatIns(ptype: string, props: Chp | Pap) {

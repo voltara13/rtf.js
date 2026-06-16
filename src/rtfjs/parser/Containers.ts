@@ -66,12 +66,23 @@ export class Chp {
     }
 }
 
+export interface IBorder {
+    width: number;
+    colorindex: number;
+}
+
 export class Pap {
     public indent: { left: number, right: number, firstline: number };
     public justification: string;
     public spacebefore: number;
     public spaceafter: number;
     public charactertype: string | null;
+    public borders: {
+        top: IBorder | null,
+        bottom: IBorder | null,
+        left: IBorder | null,
+        right: IBorder | null,
+    };
 
     constructor(parent: Pap) {
         if (parent != null) {
@@ -84,6 +95,12 @@ export class Pap {
             this.spacebefore = parent.spacebefore;
             this.spaceafter = parent.spaceafter;
             this.charactertype = parent.charactertype;
+            this.borders = {
+                top: cloneBorder(parent.borders.top),
+                bottom: cloneBorder(parent.borders.bottom),
+                left: cloneBorder(parent.borders.left),
+                right: cloneBorder(parent.borders.right),
+            };
         } else {
             this.indent = {
                 left: 0,
@@ -94,8 +111,13 @@ export class Pap {
             this.spacebefore = 0;
             this.spaceafter = 0;
             this.charactertype = null;
+            this.borders = { top: null, bottom: null, left: null, right: null };
         }
     }
+}
+
+function cloneBorder(border: IBorder | null): IBorder | null {
+    return border == null ? null : { width: border.width, colorindex: border.colorindex };
 }
 
 export class Sep {
