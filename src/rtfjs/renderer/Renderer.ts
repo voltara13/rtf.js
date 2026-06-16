@@ -161,6 +161,13 @@ export class Renderer {
         this._ensureRow();
         const cell: HTMLTableCellElement = document.createElement("td");
         if (this._curpar != null && this._cellpars.indexOf(this._curpar) < 0) {
+            // The first cell's paragraph may have been pushed to _dom by a
+            // \par that preceded the table (before \intbl took effect); reclaim
+            // it so it lives only inside the cell, not above the table.
+            const domIdx = this._dom.indexOf(this._curpar);
+            if (domIdx >= 0) {
+                this._dom.splice(domIdx, 1);
+            }
             this._cellpars.push(this._curpar);
         }
         if (this._cellpars.length === 0) {
